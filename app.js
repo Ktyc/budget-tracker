@@ -319,12 +319,28 @@ function importExcel(file) {
           // Match period label back to a key by finding transactions in that period
           // We use the date range label to find the key
           const matchingKeys = [...new Set(transactions.map(t => getPayPeriod(t.date)))];
-          matchingKeys.forEach(k => {
-            if (getPeriodLabel(k) === periodLabel && !salaries[k]) {
-              salaries[k] = parseFloat(salary) || 0;
-              salariesRestored++;
+          const sumSheet = wb.Sheets['Pay Period Summary'];
+          let salariesRestored = 0;
+          if (sumSheet) {
+            const sumRows = XLSX.utils.sheet_to_json(sumSheet, { header: 1 });
+            for (let i = 1; i < sumRows.length; i++) {
+              const row = sumRows[i];
+              // Support both old format (no Year column) and new format (Year column first)
+              const hasYearCol = row.length >= 8;
+              const periodLabel = hasYearCol ? row[1] : row[0];
+              const salary = hasYearCol ? row[2] : row[1];
+              if (!periodLabel || !salary) continue;
+              const matchingKeys = [...new Set(transactions.map(t => getPayPeriod(t.date)))];
+              matchingKeys.forEach(k => {
+                // Match by key directly or by label
+                const keyFromPeriod = k;
+                if ((getPeriodLabel(k) === periodLabel || keyFromPeriod === periodLabel) && !salaries[k]) {
+                  salaries[k] = parseFloat(salary) || 0;
+                  salariesRestored++;
+                }
+              });
             }
-          });
+          };
         }
       }
 
